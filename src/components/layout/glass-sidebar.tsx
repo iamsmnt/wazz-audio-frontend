@@ -37,9 +37,12 @@ export function GlassSidebar() {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="fixed left-0 top-0 bottom-0 z-40 w-[72px] flex flex-col items-center py-5 gap-2 glass border-r border-border-subtle"
     >
-      {/* Logo */}
-      <Link href="/dashboard" className="mb-6">
+      {/* Logo + Beta tag */}
+      <Link href="/dashboard" className="mb-4 flex flex-col items-center gap-1.5">
         <Logo size="sm" showText={false} />
+        <span className="text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded-full bg-accent-violet/15 text-accent-violet border border-accent-violet/25">
+          Beta
+        </span>
       </Link>
 
       {/* Nav items */}

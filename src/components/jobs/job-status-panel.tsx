@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { JobCard } from "./job-card";
 import {
@@ -19,8 +19,6 @@ export function JobStatusPanel() {
   const hasJobs = useHasJobs();
   const activeCount = useActiveJobCount();
   const completedCount = useCompletedJobCount();
-  const panelOpen = useJobsStore((s) => s.panelOpen);
-  const togglePanel = useJobsStore((s) => s.togglePanel);
   const removeJob = useJobsStore((s) => s.removeJob);
   const retryJob = useJobsStore((s) => s.retryJob);
   const clearCompleted = useJobsStore((s) => s.clearCompleted);
@@ -36,24 +34,20 @@ export function JobStatusPanel() {
     <AnimatePresence>
       {hasJobs && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          transition={{ duration: 0.2 }}
-          className="fixed bottom-4 right-4 z-50 w-[360px]"
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.25 }}
         >
-          {/* Header bar — always visible */}
-          <button
-            onClick={togglePanel}
-            className="w-full glass-strong flex items-center justify-between px-4 py-2.5 rounded-t-xl border border-border-subtle border-b-0 hover:bg-white/[0.03] transition-colors"
-          >
+          {/* Header */}
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-text-primary">
-                Jobs
-              </span>
+              <h3 className="text-sm font-display font-semibold text-text-primary">
+                Active Jobs
+              </h3>
               {activeCount > 0 && (
                 <Badge variant="warning" className="text-[10px] px-1.5 py-0">
-                  {activeCount} active
+                  {activeCount} processing
                 </Badge>
               )}
               {activeCount === 0 && completedCount > 0 && (
@@ -62,54 +56,31 @@ export function JobStatusPanel() {
                 </Badge>
               )}
             </div>
-            {panelOpen ? (
-              <ChevronDown className="h-4 w-4 text-text-muted" />
-            ) : (
-              <ChevronUp className="h-4 w-4 text-text-muted" />
-            )}
-          </button>
 
-          {/* Expandable body */}
-          <AnimatePresence>
-            {panelOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
+            {completedCount > 0 && (
+              <button
+                onClick={clearCompleted}
+                className="flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
               >
-                <div className="glass-strong rounded-b-xl border border-border-subtle border-t border-t-white/[0.05]">
-                  {/* Clear completed */}
-                  {completedCount > 0 && (
-                    <div className="flex justify-end px-3 pt-2">
-                      <button
-                        onClick={clearCompleted}
-                        className="flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        Clear completed
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Job list */}
-                  <div className="max-h-[320px] overflow-y-auto p-2 space-y-1.5">
-                    {jobs.map((job) => (
-                      <JobCard
-                        key={job.id}
-                        job={job}
-                        onReview={selectJob}
-                        onDownload={handleDownload}
-                        onRetry={retryJob}
-                        onRemove={removeJob}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
+                <Trash2 className="h-3 w-3" />
+                Clear completed
+              </button>
             )}
-          </AnimatePresence>
+          </div>
+
+          {/* Job list */}
+          <div className="space-y-1.5">
+            {jobs.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onReview={selectJob}
+                onDownload={handleDownload}
+                onRetry={retryJob}
+                onRemove={removeJob}
+              />
+            ))}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -23,13 +23,11 @@ export interface Job {
 
 interface JobsState {
   jobs: Record<string, Job>;
-  panelOpen: boolean;
 
   submitJob: (file: File, preset: ProcessingPreset) => void;
   retryJob: (jobId: string) => void;
   removeJob: (jobId: string) => void;
   clearCompleted: () => void;
-  togglePanel: () => void;
 
   _updateJob: (jobId: string, patch: Partial<Job>) => void;
   _startUpload: (jobId: string) => Promise<void>;
@@ -46,7 +44,6 @@ function formatSize(bytes: number): string {
 
 export const useJobsStore = create<JobsState>((set, get) => ({
   jobs: {},
-  panelOpen: false,
 
   submitJob: (file, preset) => {
     const id = crypto.randomUUID();
@@ -66,7 +63,6 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     };
     set((state) => ({
       jobs: { ...state.jobs, [id]: job },
-      panelOpen: true,
     }));
     get()._startUpload(id);
   },
@@ -103,8 +99,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     }
     set((state) => {
       const { [jobId]: _, ...rest } = state.jobs;
-      const hasJobs = Object.keys(rest).length > 0;
-      return { jobs: rest, panelOpen: hasJobs ? state.panelOpen : false };
+      return { jobs: rest };
     });
   },
 
@@ -118,14 +113,8 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         remaining[id] = job;
       }
     }
-    const hasJobs = Object.keys(remaining).length > 0;
-    set((state) => ({
-      jobs: remaining,
-      panelOpen: hasJobs ? state.panelOpen : false,
-    }));
+    set({ jobs: remaining });
   },
-
-  togglePanel: () => set((state) => ({ panelOpen: !state.panelOpen })),
 
   _updateJob: (jobId, patch) => {
     set((state) => {
@@ -184,23 +173,22 @@ export const useJobsStore = create<JobsState>((set, get) => ({
           clearInterval(pollTimers.get(jobId)!);
           pollTimers.delete(jobId);
 
-          let blobUrl: string | null = null;
-          try {
-            blobUrl = await audioApi.fetchAsBlobUrl(job.serverJobId);
-          } catch {
-            // Waveform preview unavailable, download still works
-          }
-
-          get()._updateJob(jobId, {
-            status: "completed",
-            processedBlobUrl: blobUrl,
-          });
+          // Update status immediately — don't block on blob download
+          get()._updateJob(jobId, { status: "completed" });
 
           emitToast({
             title: "Processing complete",
             description: `${job.fileName} (${formatSize(job.fileSize)}) is ready`,
             variant: "success",
           });
+
+          // Fetch blob URL in the background for waveform preview
+          try {
+            const blobUrl = await audioApi.fetchAsBlobUrl(job.serverJobId);
+            get()._updateJob(jobId, { processedBlobUrl: blobUrl });
+          } catch {
+            // Waveform preview unavailable, download still works
+          }
           return;
         }
 
@@ -221,9 +209,9 @@ export const useJobsStore = create<JobsState>((set, get) => ({
           return;
         }
 
-        // Still processing — no progress bar, just keep polling
-      } catch {
-        // Transient error, keep polling
+        // Still processing — keep polling
+      } catch (err) {
+        console.warn(`[jobs] poll failed for ${jobId}:`, err);
       }
     };
 

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { AudioUploader } from "@/components/audio/audio-uploader";
 import { WaveformDisplay } from "@/components/audio/waveform-display";
 import { PresetCard } from "@/components/features/preset-card";
+import { JobStatusPanel } from "@/components/jobs/job-status-panel";
 import { useJobsStore } from "@/lib/stores/jobs-store";
 import { useReviewStore } from "@/lib/stores/review-store";
 import { audioApi } from "@/lib/api/audio";
@@ -135,7 +136,7 @@ export default function DashboardPage() {
               )}
             </AnimatePresence>
 
-            {/* Waveform review — shown when a completed job is selected */}
+            {/* Waveform review — shown when a completed job is selected from jobs panel */}
             <AnimatePresence>
               {selectedJobId && (
                 <motion.div
@@ -191,6 +192,9 @@ export default function DashboardPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Jobs panel — inline, below uploader and review */}
+            <JobStatusPanel />
           </div>
 
           {/* Right panel — Presets */}
