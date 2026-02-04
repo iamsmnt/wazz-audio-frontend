@@ -8,6 +8,7 @@ export type ProcessingPreset =
 
 export type ProcessingStatus =
   | "idle"
+  | "queued"
   | "uploading"
   | "processing"
   | "completed"

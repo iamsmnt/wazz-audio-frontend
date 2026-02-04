@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic,
@@ -8,15 +8,16 @@ import {
   Users,
   Music,
   Download,
-  RotateCcw,
   Upload,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AudioUploader } from "@/components/audio/audio-uploader";
 import { WaveformDisplay } from "@/components/audio/waveform-display";
-import { ProcessingIndicator } from "@/components/audio/processing-indicator";
 import { PresetCard } from "@/components/features/preset-card";
-import { useAudioStore } from "@/lib/stores/audio-store";
+import { useJobsStore } from "@/lib/stores/jobs-store";
+import { useReviewStore } from "@/lib/stores/review-store";
+import { audioApi } from "@/lib/api/audio";
 import type { ProcessingPreset, PresetInfo } from "@/types/audio";
 
 const presets: PresetInfo[] = [
@@ -47,37 +48,42 @@ const presets: PresetInfo[] = [
 ];
 
 export default function DashboardPage() {
-  const {
-    originalFile,
-    originalUrl,
-    processedUrl,
-    status,
-    uploadProgress,
-    processingProgress,
-    error,
-    selectedPreset,
-    setOriginalFile,
-    setSelectedPreset,
-    uploadAndProcess,
-    downloadProcessed,
-    reset,
-  } = useAudioStore();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedPreset, setSelectedPreset] =
+    useState<ProcessingPreset>("speech_enhancement");
 
-  const handleFileSelect = useCallback(
-    (file: File) => {
-      setOriginalFile(file);
-    },
-    [setOriginalFile]
-  );
+  const submitJob = useJobsStore((s) => s.submitJob);
+
+  const selectedJobId = useReviewStore((s) => s.selectedJobId);
+  const originalBlobUrl = useReviewStore((s) => s.originalBlobUrl);
+  const processedBlobUrl = useReviewStore((s) => s.processedBlobUrl);
+  const reviewFileName = useReviewStore((s) => s.fileName);
+  const reviewServerJobId = useReviewStore((s) => s.serverJobId);
+  const reviewOriginalFilename = useReviewStore((s) => s.originalFilename);
+  const clearReview = useReviewStore((s) => s.clearReview);
+
+  const handleFileSelect = useCallback((file: File) => {
+    setSelectedFile(file);
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setSelectedFile(null);
+  }, []);
 
   const handleProcess = useCallback(() => {
-    if (originalFile) {
-      uploadAndProcess(originalFile);
+    if (selectedFile) {
+      submitJob(selectedFile, selectedPreset);
+      setSelectedFile(null);
     }
-  }, [originalFile, uploadAndProcess]);
+  }, [selectedFile, selectedPreset, submitJob]);
 
-  const isProcessing = status === "uploading" || status === "processing";
-  const isComplete = status === "completed";
+  const handleDownloadReviewed = useCallback(async () => {
+    if (!reviewServerJobId) return;
+    await audioApi.downloadFile(
+      reviewServerJobId,
+      reviewOriginalFilename ?? "audio"
+    );
+  }, [reviewServerJobId, reviewOriginalFilename]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -98,48 +104,25 @@ export default function DashboardPage() {
 
         {/* Main grid: Center + Right panel */}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-          {/* Center — Upload & Waveforms */}
+          {/* Center — Upload & Review */}
           <div className="space-y-5">
-            {/* Upload zone */}
-            <AnimatePresence mode="wait">
-              {status === "idle" && !originalFile && (
+            {/* Upload zone — always visible */}
+            <AudioUploader
+              onFileSelect={handleFileSelect}
+              selectedFile={selectedFile}
+              onClear={handleClear}
+            />
+
+            {/* Process button — shown when file selected */}
+            <AnimatePresence>
+              {selectedFile && (
                 <motion.div
-                  key="uploader"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  key="process-btn"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <AudioUploader
-                    onFileSelect={handleFileSelect}
-                    selectedFile={null}
-                  />
-                </motion.div>
-              )}
-
-              {status === "idle" && originalFile && (
-                <motion.div
-                  key="ready"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="space-y-4"
-                >
-                  <AudioUploader
-                    onFileSelect={handleFileSelect}
-                    selectedFile={originalFile}
-                    onClear={reset}
-                  />
-
-                  {/* Original waveform */}
-                  {originalUrl && (
-                    <WaveformDisplay
-                      audioUrl={originalUrl}
-                      type="original"
-                      label="Original"
-                    />
-                  )}
-
-                  {/* Process button */}
                   <Button
                     onClick={handleProcess}
                     size="lg"
@@ -150,95 +133,60 @@ export default function DashboardPage() {
                   </Button>
                 </motion.div>
               )}
+            </AnimatePresence>
 
-              {isProcessing && (
+            {/* Waveform review — shown when a completed job is selected */}
+            <AnimatePresence>
+              {selectedJobId && (
                 <motion.div
-                  key="processing"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  key="review"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  transition={{ duration: 0.3 }}
                   className="space-y-4"
                 >
-                  {originalUrl && (
-                    <WaveformDisplay
-                      audioUrl={originalUrl}
-                      type="original"
-                      label="Original"
-                    />
-                  )}
-                  <div className="glass rounded-2xl glow-pulse">
-                    <ProcessingIndicator
-                      status={status}
-                      progress={
-                        status === "uploading"
-                          ? uploadProgress
-                          : processingProgress
-                      }
-                      error={error}
-                    />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-display font-semibold text-text-primary">
+                        Reviewing
+                      </h3>
+                      <p className="text-xs text-text-muted mt-0.5 truncate max-w-[300px]">
+                        {reviewFileName}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearReview}
+                      className="text-text-muted hover:text-text-primary"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-                </motion.div>
-              )}
 
-              {isComplete && (
-                <motion.div
-                  key="complete"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="space-y-4"
-                >
-                  {/* Before / After waveforms */}
-                  {originalUrl && (
+                  {originalBlobUrl && (
                     <WaveformDisplay
-                      audioUrl={originalUrl}
+                      audioUrl={originalBlobUrl}
                       type="original"
                       label="Original"
                     />
                   )}
-                  {processedUrl && (
+                  {processedBlobUrl && (
                     <WaveformDisplay
-                      audioUrl={processedUrl}
+                      audioUrl={processedBlobUrl}
                       type="processed"
                       label="Processed"
                     />
                   )}
 
-                  {/* Actions */}
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={downloadProcessed}
-                      size="lg"
-                      className="flex-1"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download Processed
-                    </Button>
-                    <Button variant="outline" size="lg" onClick={reset}>
-                      <RotateCcw className="h-4 w-4" />
-                      New File
-                    </Button>
-                  </div>
-                </motion.div>
-              )}
-
-              {status === "failed" && (
-                <motion.div
-                  key="failed"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="space-y-4"
-                >
-                  <div className="glass rounded-2xl">
-                    <ProcessingIndicator
-                      status="failed"
-                      error={error}
-                    />
-                  </div>
-                  <Button variant="outline" onClick={reset} className="w-full">
-                    <RotateCcw className="h-4 w-4" />
-                    Try Again
+                  <Button
+                    onClick={handleDownloadReviewed}
+                    size="lg"
+                    className="w-full"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Processed
                   </Button>
                 </motion.div>
               )}
@@ -269,7 +217,7 @@ export default function DashboardPage() {
                 description={preset.description}
                 icon={preset.icon}
                 isSelected={selectedPreset === preset.id}
-                isDisabled={isProcessing}
+                isDisabled={false}
                 onClick={() =>
                   setSelectedPreset(preset.id as ProcessingPreset)
                 }

@@ -7,6 +7,8 @@ import { GlassSidebar } from "@/components/layout/glass-sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { Toaster } from "@/components/ui/toaster";
+import { JobStatusPanel } from "@/components/jobs/job-status-panel";
 
 export default function DashboardLayout({
   children,
@@ -60,6 +62,8 @@ export default function DashboardLayout({
           <main className="flex-1 p-4 md:p-6">{children}</main>
         </div>
       </div>
+      <Toaster />
+      <JobStatusPanel />
     </TooltipProvider>
   );
 }
