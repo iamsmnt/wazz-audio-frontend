@@ -14,6 +14,8 @@ export const API_ENDPOINTS = {
     UPLOAD: "/audio/upload",
     STATUS: (jobId: string) => `/audio/status/${jobId}`,
     DOWNLOAD: (jobId: string) => `/audio/download/${jobId}`,
+    PROJECTS: "/audio/projects",
+    PROJECT: (jobId: string) => `/audio/projects/${jobId}`,
   },
   USER: {
     SETTINGS: "/user/settings",

@@ -135,7 +135,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     try {
       const response = await audioApi.upload(job.file, (progress) => {
         get()._updateJob(jobId, { uploadProgress: progress });
-      });
+      }, job.preset);
 
       get()._updateJob(jobId, {
         serverJobId: response.job_id,

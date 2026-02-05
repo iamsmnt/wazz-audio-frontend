@@ -43,15 +43,16 @@ export interface StatusResponse {
 export type JobStatus = "pending" | "processing" | "completed" | "failed";
 
 export interface Project {
-  id: string;
   job_id: string;
+  project_name: string | null;
   filename: string;
   original_filename: string;
   status: JobStatus;
-  processing_type: string;
+  processing_type: string | null;
   created_at: string;
   duration?: number;
   file_size?: number;
+  file_format?: string;
 }
 
 export interface UsageStats {

@@ -1,14 +1,18 @@
 import { API_ENDPOINTS } from "./endpoints";
 import { API_BASE_URL, getAuthHeaders } from "./client";
-import type { StatusResponse, UploadResponse } from "@/types/api";
+import type { StatusResponse, UploadResponse, Project } from "@/types/api";
 
 export const audioApi = {
   upload: async (
     file: File,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    processingType?: string
   ): Promise<UploadResponse> => {
     const formData = new FormData();
     formData.append("file", file);
+    if (processingType) {
+      formData.append("processing_type", processingType);
+    }
 
     const xhr = new XMLHttpRequest();
 
@@ -107,5 +111,38 @@ export const audioApi = {
     a.click();
     URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  },
+
+  getProjects: async (): Promise<Project[]> => {
+    const response = await fetch(
+      `${API_BASE_URL}${API_ENDPOINTS.AUDIO.PROJECTS}`,
+      { headers: getAuthHeaders() }
+    );
+    if (!response.ok) throw new Error("Failed to fetch projects");
+    return response.json();
+  },
+
+  renameProject: async (jobId: string, projectName: string): Promise<Project> => {
+    const response = await fetch(
+      `${API_BASE_URL}${API_ENDPOINTS.AUDIO.PROJECT(jobId)}`,
+      {
+        method: "PATCH",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ project_name: projectName }),
+      }
+    );
+    if (!response.ok) throw new Error("Failed to rename project");
+    return response.json();
+  },
+
+  deleteProject: async (jobId: string): Promise<void> => {
+    const response = await fetch(
+      `${API_BASE_URL}${API_ENDPOINTS.AUDIO.PROJECT(jobId)}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      }
+    );
+    if (!response.ok) throw new Error("Failed to delete project");
   },
 };
