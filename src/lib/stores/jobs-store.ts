@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { audioApi } from "@/lib/api/audio";
 import { emitToast } from "@/lib/hooks/use-toast";
+import { generateId } from "@/lib/utils/id";
 import type { ProcessingPreset, ProcessingStatus } from "@/types/audio";
 
 export interface Job {
@@ -46,7 +47,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   jobs: {},
 
   submitJob: (file, preset) => {
-    const id = crypto.randomUUID();
+    const id = generateId();
     const job: Job = {
       id,
       file,

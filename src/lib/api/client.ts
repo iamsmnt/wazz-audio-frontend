@@ -1,5 +1,6 @@
 import axios from "axios";
 import type { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { generateId } from "@/lib/utils/id";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -78,7 +79,7 @@ export function getAuthHeaders(): Record<string, string> {
   } else {
     let guestId = localStorage.getItem("guestId");
     if (!guestId) {
-      guestId = crypto.randomUUID();
+      guestId = generateId();
       localStorage.setItem("guestId", guestId);
     }
     headers["X-Guest-ID"] = guestId;

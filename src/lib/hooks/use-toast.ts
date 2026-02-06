@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore, useCallback } from "react";
+import { generateId } from "@/lib/utils/id";
 
 export interface Toast {
   id: string;
@@ -20,7 +21,7 @@ function notify() {
 }
 
 function addToast(props: ToastProps): string {
-  const id = crypto.randomUUID();
+  const id = generateId();
   const toast: Toast = { id, ...props };
   toasts = [toast, ...toasts];
   notify();

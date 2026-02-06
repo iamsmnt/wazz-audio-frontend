@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/shared/logo";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { generateId } from "@/lib/utils/id";
 
 const loginSchema = z.object({
   username_or_email: z.string().min(1, "Required"),
@@ -51,7 +52,7 @@ export default function LoginPage() {
   const handleGuestMode = () => {
     let guestId = localStorage.getItem("guestId");
     if (!guestId) {
-      guestId = crypto.randomUUID();
+      guestId = generateId();
       localStorage.setItem("guestId", guestId);
     }
     router.push("/dashboard");

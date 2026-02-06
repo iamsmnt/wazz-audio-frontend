@@ -1,5 +1,6 @@
 import { API_ENDPOINTS } from "./endpoints";
 import { API_BASE_URL, getAuthHeaders } from "./client";
+import { generateId } from "@/lib/utils/id";
 import type { StatusResponse, UploadResponse, Project } from "@/types/api";
 
 export const audioApi = {
@@ -62,7 +63,7 @@ export const audioApi = {
     } else {
       let guestId = typeof window !== "undefined" ? localStorage.getItem("guestId") : null;
       if (!guestId) {
-        guestId = crypto.randomUUID();
+        guestId = generateId();
         localStorage.setItem("guestId", guestId);
       }
       params.set("guest_id", guestId);
