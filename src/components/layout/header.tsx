@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,9 +43,7 @@ export function Header() {
       {/* Right side */}
       <div className="flex items-center gap-3">
         {/* Notifications */}
-        <Button variant="ghost" size="icon-sm" className="text-text-muted">
-          <Bell className="h-4 w-4" />
-        </Button>
+        <NotificationBell />
 
         {/* User menu */}
         <DropdownMenu>
