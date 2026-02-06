@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { audioApi } from "@/lib/api/audio";
+import { emitToast } from "@/lib/hooks/use-toast";
 import type { ProcessingPreset, ProcessingStatus } from "@/types/audio";
 
 interface AudioState {
@@ -76,9 +77,12 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       // Start streaming status updates
       get().streamStatus();
     } catch (err) {
-      set({
-        status: "failed",
-        error: err instanceof Error ? err.message : "Upload failed",
+      const message = err instanceof Error ? err.message : "Upload failed";
+      set({ status: "failed", error: message });
+      emitToast({
+        title: "Upload failed",
+        description: message,
+        variant: "error",
       });
     }
   },
@@ -102,6 +106,12 @@ export const useAudioStore = create<AudioState>((set, get) => ({
         es.close();
         eventSource = null;
 
+        emitToast({
+          title: "Processing complete",
+          description: get().originalFilename ?? "Your audio is ready",
+          variant: "success",
+        });
+
         // Fetch processed audio with auth headers and create a
         // blob URL that WaveSurfer can load without credentials
         audioApi.fetchAsBlobUrl(jobId).then((blobUrl) => {
@@ -123,6 +133,13 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       if (data.status === "failed") {
         es.close();
         eventSource = null;
+
+        emitToast({
+          title: "Processing failed",
+          description: data.error_message || "Something went wrong",
+          variant: "error",
+        });
+
         set({
           status: "failed",
           error: data.error_message || "Processing failed",
