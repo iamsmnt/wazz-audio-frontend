@@ -10,14 +10,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useJobsStore, useJobsList } from "@/lib/stores/jobs-store";
+import { useJobsList } from "@/lib/stores/jobs-store";
 
 export function NotificationBell() {
   const [lastSeenAt, setLastSeenAt] = useState(Date.now);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const jobs = useJobsList();
 
   const notifications = jobs.filter(
-    (j) => j.status === "completed" || j.status === "failed"
+    (j) =>
+      (j.status === "completed" || j.status === "failed") &&
+      !dismissedIds.has(j.id)
   );
 
   const unreadCount = notifications.filter(
@@ -30,7 +33,9 @@ export function NotificationBell() {
     }
   }, []);
 
-  const removeJob = useJobsStore((s) => s.removeJob);
+  const dismiss = useCallback((id: string) => {
+    setDismissedIds((prev) => new Set(prev).add(id));
+  }, []);
 
   return (
     <DropdownMenu onOpenChange={handleOpen}>
@@ -75,7 +80,7 @@ export function NotificationBell() {
                   </p>
                 </div>
                 <button
-                  onClick={() => removeJob(job.id)}
+                  onClick={() => dismiss(job.id)}
                   className="text-xs text-text-muted hover:text-text-secondary transition-colors shrink-0"
                 >
                   Dismiss
