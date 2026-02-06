@@ -45,7 +45,7 @@ const presets: PresetInfo[] = [
   {
     id: "music_separation",
     name: "Music Separation",
-    description: "Isolate vocals, drums, bass, and instruments",
+    description: "Isolate vocals, drums, bass, and instruments (coming soon)",
     icon: Video,
   },
 ];
@@ -245,7 +245,7 @@ export default function DashboardPage() {
                 description={preset.description}
                 icon={preset.icon}
                 isSelected={selectedPreset === preset.id}
-                isDisabled={false}
+                isDisabled={preset.id === "music_separation"}
                 onClick={() =>
                   setSelectedPreset(preset.id as ProcessingPreset)
                 }
