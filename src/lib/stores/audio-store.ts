@@ -21,12 +21,12 @@ interface AudioState {
   setOriginalFile: (file: File) => void;
   setSelectedPreset: (preset: ProcessingPreset) => void;
   uploadAndProcess: (file: File) => Promise<void>;
-  pollStatus: () => void;
+  streamStatus: () => void;
   downloadProcessed: () => Promise<void>;
   reset: () => void;
 }
 
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let eventSource: EventSource | null = null;
 
 export const useAudioStore = create<AudioState>((set, get) => ({
   originalFile: null,
@@ -73,8 +73,8 @@ export const useAudioStore = create<AudioState>((set, get) => ({
         processingProgress: response.progress ?? 0,
       });
 
-      // Start polling
-      get().pollStatus();
+      // Start streaming status updates
+      get().streamStatus();
     } catch (err) {
       set({
         status: "failed",
@@ -83,58 +83,62 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     }
   },
 
-  pollStatus: () => {
-    if (pollTimer) clearInterval(pollTimer);
+  streamStatus: () => {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
 
-    const poll = async () => {
-      const { jobId } = get();
-      if (!jobId) return;
+    const { jobId } = get();
+    if (!jobId) return;
 
-      try {
-        const data = await audioApi.getStatus(jobId);
+    const es = audioApi.subscribeToStatus(jobId);
+    eventSource = es;
 
-        if (data.status === "completed") {
-          if (pollTimer) clearInterval(pollTimer);
-          pollTimer = null;
+    es.addEventListener("status", (e) => {
+      const data = JSON.parse(e.data);
 
-          // Fetch processed audio with auth headers and create a
-          // blob URL that WaveSurfer can load without credentials
-          try {
-            const blobUrl = await audioApi.fetchAsBlobUrl(jobId);
-            set({
-              status: "completed",
-              processingProgress: 100,
-              processedUrl: blobUrl,
-            });
-          } catch {
-            // Waveform preview unavailable, download still works
-            set({
-              status: "completed",
-              processingProgress: 100,
-              processedUrl: null,
-            });
-          }
-          return;
-        }
+      if (data.status === "completed") {
+        es.close();
+        eventSource = null;
 
-        if (data.status === "failed") {
-          if (pollTimer) clearInterval(pollTimer);
-          pollTimer = null;
+        // Fetch processed audio with auth headers and create a
+        // blob URL that WaveSurfer can load without credentials
+        audioApi.fetchAsBlobUrl(jobId).then((blobUrl) => {
           set({
-            status: "failed",
-            error: data.error_message || "Processing failed",
+            status: "completed",
+            processingProgress: 100,
+            processedUrl: blobUrl,
           });
-          return;
-        }
-
-        set({ processingProgress: data.progress ?? 0 });
-      } catch {
-        // keep polling on transient errors
+        }).catch(() => {
+          set({
+            status: "completed",
+            processingProgress: 100,
+            processedUrl: null,
+          });
+        });
+        return;
       }
-    };
 
-    poll();
-    pollTimer = setInterval(poll, 2000);
+      if (data.status === "failed") {
+        es.close();
+        eventSource = null;
+        set({
+          status: "failed",
+          error: data.error_message || "Processing failed",
+        });
+        return;
+      }
+
+      set({ processingProgress: data.progress ?? 0 });
+    });
+
+    es.onerror = () => {
+      if (es.readyState === EventSource.CLOSED) {
+        eventSource = null;
+      }
+      // EventSource auto-reconnects on transient errors
+    };
   },
 
   downloadProcessed: async () => {
@@ -144,9 +148,9 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   },
 
   reset: () => {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
     }
     const { originalUrl, processedUrl } = get();
     if (originalUrl) URL.revokeObjectURL(originalUrl);

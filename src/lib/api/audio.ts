@@ -53,6 +53,26 @@ export const audioApi = {
     });
   },
 
+  subscribeToStatus: (jobId: string): EventSource => {
+    const params = new URLSearchParams();
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+
+    if (token) {
+      params.set("token", token);
+    } else {
+      let guestId = typeof window !== "undefined" ? localStorage.getItem("guestId") : null;
+      if (!guestId) {
+        guestId = crypto.randomUUID();
+        localStorage.setItem("guestId", guestId);
+      }
+      params.set("guest_id", guestId);
+    }
+
+    return new EventSource(
+      `${API_BASE_URL}${API_ENDPOINTS.AUDIO.STREAM(jobId)}?${params.toString()}`
+    );
+  },
+
   getStatus: async (jobId: string): Promise<StatusResponse> => {
     const response = await fetch(
       `${API_BASE_URL}${API_ENDPOINTS.AUDIO.STATUS(jobId)}`,

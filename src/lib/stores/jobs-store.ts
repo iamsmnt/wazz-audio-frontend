@@ -31,10 +31,10 @@ interface JobsState {
 
   _updateJob: (jobId: string, patch: Partial<Job>) => void;
   _startUpload: (jobId: string) => Promise<void>;
-  _startPolling: (jobId: string) => void;
+  _startStreaming: (jobId: string) => void;
 }
 
-const pollTimers = new Map<string, ReturnType<typeof setInterval>>();
+const eventSources = new Map<string, EventSource>();
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -70,10 +70,10 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   retryJob: (jobId) => {
     const job = get().jobs[jobId];
     if (!job) return;
-    // Clear any existing poll timer
-    if (pollTimers.has(jobId)) {
-      clearInterval(pollTimers.get(jobId)!);
-      pollTimers.delete(jobId);
+    // Close any existing SSE connection
+    if (eventSources.has(jobId)) {
+      eventSources.get(jobId)!.close();
+      eventSources.delete(jobId);
     }
     get()._updateJob(jobId, {
       status: "queued",
@@ -88,10 +88,10 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   removeJob: (jobId) => {
     const job = get().jobs[jobId];
     if (!job) return;
-    // Clean up poll timer
-    if (pollTimers.has(jobId)) {
-      clearInterval(pollTimers.get(jobId)!);
-      pollTimers.delete(jobId);
+    // Close SSE connection
+    if (eventSources.has(jobId)) {
+      eventSources.get(jobId)!.close();
+      eventSources.delete(jobId);
     }
     // Revoke blob URL
     if (job.processedBlobUrl) {
@@ -143,7 +143,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         status: "processing",
       });
 
-      get()._startPolling(jobId);
+      get()._startStreaming(jobId);
     } catch (err) {
       get()._updateJob(jobId, {
         status: "failed",
@@ -157,66 +157,70 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     }
   },
 
-  _startPolling: (jobId) => {
-    if (pollTimers.has(jobId)) {
-      clearInterval(pollTimers.get(jobId)!);
+  _startStreaming: (jobId) => {
+    // Close any existing connection for this job
+    if (eventSources.has(jobId)) {
+      eventSources.get(jobId)!.close();
     }
 
-    const poll = async () => {
-      const job = get().jobs[jobId];
-      if (!job?.serverJobId) return;
+    const job = get().jobs[jobId];
+    if (!job?.serverJobId) return;
 
-      try {
-        const data = await audioApi.getStatus(job.serverJobId);
+    const es = audioApi.subscribeToStatus(job.serverJobId);
+    eventSources.set(jobId, es);
 
-        if (data.status === "completed") {
-          clearInterval(pollTimers.get(jobId)!);
-          pollTimers.delete(jobId);
+    es.addEventListener("status", (e) => {
+      const data = JSON.parse(e.data);
 
-          // Update status immediately — don't block on blob download
-          get()._updateJob(jobId, { status: "completed" });
+      if (data.status === "completed") {
+        es.close();
+        eventSources.delete(jobId);
 
-          emitToast({
-            title: "Processing complete",
-            description: `${job.fileName} (${formatSize(job.fileSize)}) is ready`,
-            variant: "success",
-          });
+        get()._updateJob(jobId, { status: "completed" });
 
-          // Fetch blob URL in the background for waveform preview
-          try {
-            const blobUrl = await audioApi.fetchAsBlobUrl(job.serverJobId);
-            get()._updateJob(jobId, { processedBlobUrl: blobUrl });
-          } catch {
-            // Waveform preview unavailable, download still works
-          }
-          return;
-        }
+        emitToast({
+          title: "Processing complete",
+          description: `${job.fileName} (${formatSize(job.fileSize)}) is ready`,
+          variant: "success",
+        });
 
-        if (data.status === "failed") {
-          clearInterval(pollTimers.get(jobId)!);
-          pollTimers.delete(jobId);
+        // Fetch blob URL in the background for waveform preview
+        audioApi.fetchAsBlobUrl(job.serverJobId!).then((blobUrl) => {
+          get()._updateJob(jobId, { processedBlobUrl: blobUrl });
+        }).catch(() => {
+          // Waveform preview unavailable, download still works
+        });
+        return;
+      }
 
-          get()._updateJob(jobId, {
-            status: "failed",
-            error: data.error_message || "Processing failed",
-          });
+      if (data.status === "failed") {
+        es.close();
+        eventSources.delete(jobId);
 
-          emitToast({
-            title: "Processing failed",
-            description: job.fileName,
-            variant: "error",
-          });
-          return;
-        }
+        get()._updateJob(jobId, {
+          status: "failed",
+          error: data.error_message || "Processing failed",
+        });
 
-        // Still processing — keep polling
-      } catch (err) {
-        console.warn(`[jobs] poll failed for ${jobId}:`, err);
+        emitToast({
+          title: "Processing failed",
+          description: job.fileName,
+          variant: "error",
+        });
+        return;
+      }
+
+      // Still processing — update progress if present
+    });
+
+    es.onerror = () => {
+      // EventSource auto-reconnects on error.
+      // If the connection is permanently dead, readyState will be CLOSED.
+      if (es.readyState === EventSource.CLOSED) {
+        eventSources.delete(jobId);
+        console.warn(`[jobs] SSE connection closed for ${jobId}`);
       }
     };
-
-    poll();
-    pollTimers.set(jobId, setInterval(poll, 2000));
   },
 }));
 

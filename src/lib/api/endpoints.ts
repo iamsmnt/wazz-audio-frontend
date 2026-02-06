@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   AUDIO: {
     UPLOAD: "/audio/upload",
     STATUS: (jobId: string) => `/audio/status/${jobId}`,
+    STREAM: (jobId: string) => `/audio/stream/${jobId}`,
     DOWNLOAD: (jobId: string) => `/audio/download/${jobId}`,
     PROJECTS: "/audio/projects",
     PROJECT: (jobId: string) => `/audio/projects/${jobId}`,
