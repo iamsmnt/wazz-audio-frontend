@@ -38,6 +38,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (!job) return;
 
     const originalBlobUrl = URL.createObjectURL(job.file);
+    const hasProcessedUrl = !!job.processedBlobUrl;
 
     set({
       selectedJobId: jobId,
@@ -46,8 +47,21 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       fileName: job.fileName,
       serverJobId: job.serverJobId,
       originalFilename: job.originalFilename,
-      loading: false,
+      loading: !hasProcessedUrl && !!job.serverJobId,
     });
+
+    // If blob URL not ready yet (fetch still in progress), fetch it ourselves
+    if (!hasProcessedUrl && job.serverJobId) {
+      audioApi.fetchAsBlobUrl(job.serverJobId).then((blobUrl) => {
+        if (get().selectedJobId === jobId) {
+          set({ processedBlobUrl: blobUrl, loading: false });
+        }
+      }).catch(() => {
+        if (get().selectedJobId === jobId) {
+          set({ loading: false });
+        }
+      });
+    }
   },
 
   loadProject: async (serverJobId, fileName) => {
