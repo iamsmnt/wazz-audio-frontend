@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic,
@@ -10,6 +11,7 @@ import {
   Download,
   Upload,
   X,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AudioUploader } from "@/components/audio/audio-uploader";
@@ -55,13 +57,26 @@ export default function DashboardPage() {
 
   const submitJob = useJobsStore((s) => s.submitJob);
 
+  const searchParams = useSearchParams();
+
   const selectedJobId = useReviewStore((s) => s.selectedJobId);
   const originalBlobUrl = useReviewStore((s) => s.originalBlobUrl);
   const processedBlobUrl = useReviewStore((s) => s.processedBlobUrl);
   const reviewFileName = useReviewStore((s) => s.fileName);
   const reviewServerJobId = useReviewStore((s) => s.serverJobId);
   const reviewOriginalFilename = useReviewStore((s) => s.originalFilename);
+  const reviewLoading = useReviewStore((s) => s.loading);
+  const loadProject = useReviewStore((s) => s.loadProject);
   const clearReview = useReviewStore((s) => s.clearReview);
+
+  // Load project from URL params (e.g. /dashboard?project=abc&name=my-audio.wav)
+  useEffect(() => {
+    const projectId = searchParams.get("project");
+    const name = searchParams.get("name");
+    if (projectId) {
+      loadProject(projectId, name || "audio");
+    }
+  }, [searchParams, loadProject]);
 
   const handleFileSelect = useCallback((file: File) => {
     setSelectedFile(file);
@@ -166,29 +181,38 @@ export default function DashboardPage() {
                     </Button>
                   </div>
 
-                  {originalBlobUrl && (
-                    <WaveformDisplay
-                      audioUrl={originalBlobUrl}
-                      type="original"
-                      label="Original"
-                    />
-                  )}
-                  {processedBlobUrl && (
-                    <WaveformDisplay
-                      audioUrl={processedBlobUrl}
-                      type="processed"
-                      label="Processed"
-                    />
-                  )}
+                  {reviewLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+                      <span className="ml-2 text-sm text-text-muted">Loading audio...</span>
+                    </div>
+                  ) : (
+                    <>
+                      {originalBlobUrl && (
+                        <WaveformDisplay
+                          audioUrl={originalBlobUrl}
+                          type="original"
+                          label="Original"
+                        />
+                      )}
+                      {processedBlobUrl && (
+                        <WaveformDisplay
+                          audioUrl={processedBlobUrl}
+                          type="processed"
+                          label="Processed"
+                        />
+                      )}
 
-                  <Button
-                    onClick={handleDownloadReviewed}
-                    size="lg"
-                    className="w-full"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download Processed
-                  </Button>
+                      <Button
+                        onClick={handleDownloadReviewed}
+                        size="lg"
+                        className="w-full"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download Processed
+                      </Button>
+                    </>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

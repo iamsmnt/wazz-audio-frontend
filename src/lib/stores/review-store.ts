@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { useJobsStore } from "./jobs-store";
+import { audioApi } from "@/lib/api/audio";
 
 interface ReviewState {
   selectedJobId: string | null;
@@ -10,9 +11,15 @@ interface ReviewState {
   fileName: string | null;
   serverJobId: string | null;
   originalFilename: string | null;
+  loading: boolean;
 
   selectJob: (jobId: string) => void;
+  loadProject: (serverJobId: string, fileName: string) => Promise<void>;
   clearReview: () => void;
+}
+
+function revokeUrls(state: ReviewState) {
+  if (state.originalBlobUrl) URL.revokeObjectURL(state.originalBlobUrl);
 }
 
 export const useReviewStore = create<ReviewState>((set, get) => ({
@@ -22,11 +29,10 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   fileName: null,
   serverJobId: null,
   originalFilename: null,
+  loading: false,
 
   selectJob: (jobId) => {
-    // Revoke previous original blob URL
-    const prev = get().originalBlobUrl;
-    if (prev) URL.revokeObjectURL(prev);
+    revokeUrls(get());
 
     const job = useJobsStore.getState().jobs[jobId];
     if (!job) return;
@@ -40,12 +46,37 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       fileName: job.fileName,
       serverJobId: job.serverJobId,
       originalFilename: job.originalFilename,
+      loading: false,
     });
   },
 
+  loadProject: async (serverJobId, fileName) => {
+    revokeUrls(get());
+
+    set({
+      selectedJobId: `project-${serverJobId}`,
+      originalBlobUrl: null,
+      processedBlobUrl: null,
+      fileName,
+      serverJobId,
+      originalFilename: fileName,
+      loading: true,
+    });
+
+    try {
+      const [originalBlobUrl, processedBlobUrl] = await Promise.all([
+        audioApi.fetchOriginalAsBlobUrl(serverJobId),
+        audioApi.fetchAsBlobUrl(serverJobId),
+      ]);
+
+      set({ originalBlobUrl, processedBlobUrl, loading: false });
+    } catch {
+      set({ loading: false });
+    }
+  },
+
   clearReview: () => {
-    const { originalBlobUrl } = get();
-    if (originalBlobUrl) URL.revokeObjectURL(originalBlobUrl);
+    revokeUrls(get());
 
     set({
       selectedJobId: null,
@@ -54,6 +85,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       fileName: null,
       serverJobId: null,
       originalFilename: null,
+      loading: false,
     });
   },
 }));

@@ -98,6 +98,16 @@ export const audioApi = {
     return URL.createObjectURL(blob);
   },
 
+  fetchOriginalAsBlobUrl: async (jobId: string): Promise<string> => {
+    const response = await fetch(
+      `${API_BASE_URL}${API_ENDPOINTS.AUDIO.ORIGINAL(jobId)}`,
+      { headers: getAuthHeaders() }
+    );
+    if (!response.ok) throw new Error("Failed to fetch original audio");
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  },
+
   downloadFile: async (jobId: string, originalFilename: string) => {
     const response = await fetch(
       `${API_BASE_URL}${API_ENDPOINTS.AUDIO.DOWNLOAD(jobId)}`,

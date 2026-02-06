@@ -31,6 +31,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { audioApi } from "@/lib/api/audio";
 import type { Project } from "@/types/api";
 
@@ -72,6 +73,14 @@ export default function ProjectsPage() {
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const router = useRouter();
+
+  const openProject = (project: Project) => {
+    if (project.status !== "completed") return;
+    const name = project.project_name || project.original_filename;
+    router.push(`/dashboard?project=${project.job_id}&name=${encodeURIComponent(name)}`);
+  };
 
   useEffect(() => {
     audioApi
@@ -186,7 +195,8 @@ export default function ProjectsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ delay: i * 0.05 }}
-                  className="glass rounded-2xl p-5 gradient-border hover:bg-white/[0.04] transition-colors"
+                  onDoubleClick={() => openProject(project)}
+                  className={`glass rounded-2xl p-5 gradient-border hover:bg-white/[0.04] transition-colors ${project.status === "completed" ? "cursor-pointer" : ""}`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="rounded-lg bg-accent-violet-muted p-2">
